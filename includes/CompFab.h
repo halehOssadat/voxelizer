@@ -115,6 +115,8 @@ namespace CompFab
     //Dot Product
     precision_type operator*(const Vec3 &v1, const Vec3 &v2);
     
+    //comparison
+    bool operator==(const Vec3 &v1, const Vec3 &v2);
     
     //Grid structure for Voxels
     typedef struct VoxelGridStruct

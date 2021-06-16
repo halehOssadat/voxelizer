@@ -28,6 +28,11 @@ public:
   void load(std::istream &in);
   void read_ply(std::istream & f);
   void read_obj(std::istream &f);
+  
+  void read_stl(std::istream &f, bool stlFlag);
+  bool is_bin_stl(std::istream &f);
+  bool read_stl_bin(std::istream &f);
+  //bool read_stl_ascii(std::istream &f);
 
   void save_obj(const char * filename);
   void load_tex(const char * filename);

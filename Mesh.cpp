@@ -13,6 +13,8 @@
 #include <map>
 #include <sstream>
 #include <string.h>
+
+#include <cassert>
 //#include "util.h"
 
 // typedef double CompFab::precision_type;
@@ -284,11 +286,147 @@ void Mesh::read_ply(std::istream & f)
   }
 }
 
+void Mesh::read_stl(std::istream &f,bool stlFlag)
+{
+  if(stlFlag)
+  {
+    read_stl_bin(f);
+  }
+  else
+  {
+    // I need to add reading stl files
+    std::cout << "Unable to read STL ASCII files" << std::endl;
+  }
+}
+
+bool Mesh::read_stl_bin(std::istream &file)
+{
+  if (!file) {
+    throw std::runtime_error("Failed to open file");
+  }
+
+  constexpr size_t FLOAT_SIZE = sizeof(float);
+  static_assert(FLOAT_SIZE == 4, "float type is not 4 bytes");
+  constexpr size_t LINE_SIZE = 256;
+  char buf[LINE_SIZE];
+
+  // 80 bytes header, no data significance.
+  file.read(buf, 80);
+  if (!file.good()) {
+    throw std::runtime_error("Unable to parse STL header.");
+  }
+
+  file.read(buf, 4);
+  const size_t num_faces = *reinterpret_cast<uint32_t *>(buf);
+  if (!file.good()) {
+    throw std::runtime_error("Unable to parse STL number of faces.");
+  }
+  
+  int counter = 0;
+  std::vector<int> vidx;
+
+  for (size_t i = 0; i < num_faces; i++) {
+    // Parse normal
+    file.read(buf, FLOAT_SIZE * 3);
+    auto nx = *reinterpret_cast<float *>(buf);
+    auto ny = *reinterpret_cast<float *>(buf + FLOAT_SIZE);
+    auto nz = *reinterpret_cast<float *>(buf + FLOAT_SIZE * 2);
+    assert(file.good());
+    
+    CompFab::Vec3 n1; 
+    n1[0] = nx;
+    n1[1] = ny;
+    n1[2] = nz;
+    n.push_back(n1);
+
+    CompFab::Vec3i trig;
+    for (int j = 0; j < 3; j++)
+    {
+      // vertex j = 0, 1 , 2
+      file.read(buf, FLOAT_SIZE * 3);
+      auto vx = *reinterpret_cast<float *>(buf);
+      auto vy = *reinterpret_cast<float *>(buf + FLOAT_SIZE);
+      auto vz = *reinterpret_cast<float *>(buf + FLOAT_SIZE * 2);
+      assert(file.good());
+
+      CompFab::Vec3 v1;
+      v1[0] = vx;
+      v1[1] = vy;
+      v1[2] = vz;
+      
+      auto itr = std::find(v.begin(), v.end(), v1);
+      if ( itr != v.end())
+      {
+        int index = std::distance(v.begin(), itr);
+        trig[j] = index;
+      }
+      else
+      {
+        trig[j] = counter;
+        vidx.push_back(counter);
+        v.push_back(v1);
+        counter++;
+      }
+
+
+    }
+    
+    // attribute (2 bytes), not sure what purpose they serve.
+    file.read(buf, 2);
+    t.push_back(trig);
+
+    assert(file.good());
+    if (!file.good()) {
+      std::stringstream err_msg;
+      err_msg << "Failed to parse face " << i << " from STL file";
+      throw std::runtime_error(err_msg.str());
+    }
+    
+  }
+  std::cout << "Num Triangles: " << t.size() << std::endl;
+
+  return true;
+
+}
+
+bool Mesh::is_bin_stl(std::istream &file)
+{
+  std::streampos start_pos = file.tellg();
+
+  constexpr size_t HEADER_SIZE = 80;
+  char header[HEADER_SIZE];
+  file.read(header, HEADER_SIZE);
+  std::string H(header);
+
+  if (H.find("solid") == 0) {
+    file.seekg(start_pos);
+    return false;
+  }
+  else if (file.good()) {
+    file.seekg(start_pos);
+    return true;
+  }
+  // Check if filesize matches the number of faces claimed.
+  char buf[4];
+  file.read(buf, 4);
+  size_t num_faces = *reinterpret_cast<uint32_t *>(buf);
+  file.seekg(0, file.end);
+  size_t file_size = file.tellg();
+
+  file.seekg(start_pos);
+
+  if (file_size == 80 + 4 + (4 * 12 + 2) * num_faces) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void Mesh::save_obj(const char * filename)
 {
   std::ofstream out(filename);
   if(!out.good()){
-    std::cout<<"cannot open output file"<<filename<<"\n";
+    std::cout<< "cannot open output file" <<filename<<"\n";
     return;
   }
   save(out);
@@ -309,7 +447,7 @@ void Mesh::load_mesh(const char * filename, bool normalize)
   std::ifstream f ;
   f.open(filename);
   if(!f.good()) {
-    std::cout<<"Error: cannot open mesh "<<filename<<"\n";
+    std::cout<< "Error: cannot open mesh" << filename <<"\n";
     return;
   }
   switch(filename[strlen(filename)-1]) {
@@ -319,6 +457,8 @@ void Mesh::load_mesh(const char * filename, bool normalize)
   case 'j':
     read_obj(f);
     break;
+  case 'l':
+    read_stl(f,is_bin_stl(f));
   default:
     break;
   }

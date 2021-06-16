@@ -124,6 +124,20 @@ precision_type CompFab::operator*(const Vec3 &v1, const Vec3 &v2)
     return v1.m_x*v2.m_x + v1.m_y*v2.m_y+v1.m_z*v2.m_z;
 }
 
+//comparison between two vectors
+bool CompFab::operator==(const Vec3 &v1, const Vec3 &v2)
+{
+    if (v1[0] == v2[0] & v1[1] == v2[1] & v1[2] == v2[2])
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+
+
+}
 
 //Grid structure for Voxels
 CompFab::VoxelGridStruct::VoxelGridStruct(Vec3 lowerLeft, unsigned int dimX, unsigned int dimY, unsigned int dimZ, precision_type spacing)
