@@ -50,8 +50,15 @@ extern Mesh UNIT_CUBE;
 void BBox(const Mesh & m, CompFab::Vec3 & mn,
     CompFab::Vec3 & mx);
 
+void BBox(const Mesh & m, CompFab::Vec2f & mn,
+    CompFab::Vec2f & mx);
+
+
 void BBox(const std::vector<CompFab::Vec3> & v, CompFab::Vec3 & mn,
     CompFab::Vec3 & mx);
+
+void BBox(const std::vector<CompFab::Vec3> &v, CompFab::Vec2f &mn, 
+    CompFab::Vec2f &mx);
 
 bool ptInBox(const CompFab::Vec3 & mn,
     const CompFab::Vec3 mx, const CompFab::Vec3 & x);

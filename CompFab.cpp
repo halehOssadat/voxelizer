@@ -42,6 +42,16 @@ void CompFab::Vec3Struct::normalize() {
     }
 }
 
+void CompFab::Vec2Struct::normalize(){
+    precision_type magnitude = sqrt(m_x*m_x + m_y*m_y);
+
+    if(magnitude > EPSILON)
+    {
+        m_x /= magnitude;
+        m_y /= magnitude;
+    }
+}
+
 //Data Types
 CompFab::Vec3iStruct::Vec3iStruct()
 {
@@ -55,12 +65,12 @@ CompFab::Vec3iStruct::Vec3iStruct(precision_type x, precision_type y, precision_
     m_z = z;
 }
 
-CompFab::Vec2fStruct::Vec2fStruct()
+CompFab::Vec2Struct::Vec2Struct()
 {
     m_x = m_y = 0.0;
 }
 
-CompFab::Vec2fStruct::Vec2fStruct(precision_type x, precision_type y)
+CompFab::Vec2Struct::Vec2Struct(precision_type x, precision_type y)
 {
     m_x = x;
     m_y = y;
@@ -92,6 +102,15 @@ CompFab::Vec3 CompFab::operator-(const Vec3 &v1, const Vec3 &v2)
     v3[0] = v1[0] - v2[0];
     v3[1] = v1[1] - v2[1];
     v3[2] = v1[2] - v2[2];
+
+    return v3;
+}
+
+CompFab::Vec2f CompFab::operator-(const Vec2f &v1, const Vec2f &v2)
+{
+    Vec2f v3;
+    v3[0] = v1[0] - v2[0];
+    v3[1] = v1[1] - v2[1];
 
     return v3;
 }
@@ -139,7 +158,7 @@ bool CompFab::operator==(const Vec3 &v1, const Vec3 &v2)
 
 }
 
-//Grid structure for Voxels
+//Grid structure for Voxels in 3D
 CompFab::VoxelGridStruct::VoxelGridStruct(Vec3 lowerLeft, unsigned int dimX, unsigned int dimY, unsigned int dimZ, precision_type spacing)
 {
     m_lowerLeft = lowerLeft;
@@ -147,6 +166,28 @@ CompFab::VoxelGridStruct::VoxelGridStruct(Vec3 lowerLeft, unsigned int dimX, uns
     m_dimY = dimY;
     m_dimZ = dimZ;
     m_size = dimX*dimY*dimZ;
+    m_spacing = spacing;
+    
+    //Allocate Memory
+    m_insideArray = new bool[m_size];
+
+    for(unsigned int ii=0; ii<m_size; ++ii)
+    {
+        m_insideArray[ii] = false;
+    }
+    
+}
+
+//Grid Stucture for Voxels in 2D
+CompFab::VoxelGridStruct::VoxelGridStruct(Vec2f lowerLeft, unsigned int dimX, unsigned int dimY, precision_type spacing)
+{
+    std::cout << "reached" << std::endl;
+    m_lowerLeft[0] = lowerLeft[0];
+    m_lowerLeft[1] = lowerLeft[1];
+    m_lowerLeft[2] = 0;
+    m_dimX = dimX;
+    m_dimY = dimY;
+    m_size = dimX*dimY;
     m_spacing = spacing;
 
     //Allocate Memory

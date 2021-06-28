@@ -22,6 +22,7 @@ struct VoxelizerArgs : Args {
 	int size;
 	// width, height, depth;
 	int samples;
+	int dimension;
 };
 
 // construct the command line arguments
@@ -37,6 +38,7 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	TCLAP::ValueArg<std::string> format("f", "format","voxel grid save format - obj|binvox", false, "binvox", "string");
 	TCLAP::ValueArg<int> size(  "r","resolution", "voxelization resolution",  false, 32, "int");
 	TCLAP::ValueArg<int> samples( "s","samples", "number of sample rays per vertex",  false, -1, "int");
+	TCLAP::ValueArg<int> dimension( "i","dimension", "number of dimensions",  false, 3, "int");
 
 	TCLAP::MultiSwitchArg verbosity( "v", "verbose", "Verbosity level. Multiple flags for more verbosity.");
 	TCLAP::SwitchArg double_thick( "d", "double", "Flag for processing double-thick meshes. Uses (num_intersections/2)%2 for occupancy checking.", false);
@@ -47,6 +49,7 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	cmd.add(size); cmd.add(format); 
 	// cmd.add(width); cmd.add(height); cmd.add(depth); 
 	cmd.add(verbosity); cmd.add(samples); cmd.add(double_thick);
+	cmd.add(dimension);
 	cmd.parse( argc, argv );
 
 	// store in wrapper struct
@@ -59,6 +62,7 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	args->samples  = samples.getValue();
 	args->verbosity  = verbosity.getValue();
 	args->double_thick  = double_thick.getValue();
+	args->dimension = dimension.getValue();
 
 	args->debug(1) << "input:     " << args->input  << std::endl;
 	args->debug(1) << "output:    " << args->output << std::endl;
@@ -92,7 +96,7 @@ typedef std::vector<CompFab::Triangle> TriangleList;
 TriangleList g_triangleList;
 CompFab::VoxelGrid *g_voxelGrid;
 
-bool loadMesh(const char *filename, unsigned int dim)
+bool loadMesh(const char *filename, unsigned int dim, const int D)
 {
 	g_triangleList.clear();
 	
@@ -109,28 +113,56 @@ bool loadMesh(const char *filename, unsigned int dim)
 		g_triangleList.push_back(CompFab::Triangle(v1,v2,v3));
 	}
 
-	//Create Voxel Grid
-	CompFab::Vec3 bbMax, bbMin;
-	BBox(*tempMesh, bbMin, bbMax);
-	
-	//Build Voxel Grid
-	double bbX = bbMax[0] - bbMin[0];
-	double bbY = bbMax[1] - bbMin[1];
-	double bbZ = bbMax[2] - bbMin[2];
-	double spacing;
-	
-	if(bbX > bbY && bbX > bbZ)
+	if (D == 3)
 	{
-		spacing = bbX/(double)(dim-2);
-	} else if(bbY > bbX && bbY > bbZ) {
-		spacing = bbY/(double)(dim-2);
-	} else {
-		spacing = bbZ/(double)(dim-2);
+		//Create Voxel Grid
+		CompFab::Vec3 bbMax, bbMin;
+		BBox(*tempMesh, bbMin, bbMax);
+	
+		//Build Voxel Grid
+		double bbX = bbMax[0] - bbMin[0];
+		double bbY = bbMax[1] - bbMin[1];
+		double bbZ = bbMax[2] - bbMin[2];
+		double spacing;
+	
+		if(bbX > bbY && bbX > bbZ)
+		{
+			spacing = bbX/(double)(dim-2);
+		} else if(bbY > bbX && bbY > bbZ) {
+			spacing = bbY/(double)(dim-2);
+		} else {
+			spacing = bbZ/(double)(dim-2);
+		}
+		
+		CompFab::Vec3 hspacing(0.5*spacing, 0.5*spacing, 0.5*spacing);
+
+		g_voxelGrid = new CompFab::VoxelGrid(bbMin-hspacing, dim, dim, dim, spacing);
+	}
+	else if (D == 2)
+	{
+		//Create Voxel Grid
+		CompFab::Vec2f bbMax, bbMin;
+		BBox(*tempMesh, bbMin, bbMax);
+
+		//Build Voxel Grid
+		double bbX = bbMax[0] - bbMin[0];
+		double bbY = bbMax[1] - bbMin[1];
+		double spacing;
+
+		if(bbX > bbY)
+		{
+			spacing = bbX /(double)(dim - 2);
+		}
+		else
+		{
+			spacing = bbY/(double)(dim - 2);
+		}
+
+		CompFab::Vec2f hspacing(0.5*spacing,0.5*spacing);
+
+		g_voxelGrid = new CompFab::VoxelGrid(bbMin-hspacing, dim, dim, spacing);
 	}
 	
-	CompFab::Vec3 hspacing(0.5*spacing, 0.5*spacing, 0.5*spacing);
-
-	g_voxelGrid = new CompFab::VoxelGrid(bbMin-hspacing, dim, dim, dim, spacing);
 
 	delete tempMesh;
 	return true;
@@ -182,25 +214,37 @@ bool save(VoxelizerArgs *args) {
 	return true;
 }
 
-extern void kernel_wrapper(int samples, int w, int h, int d, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
+extern void kernel_wrapper_3D(int samples, int w, int h, int d, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
+
+//extern void kernel_wrapper_2D(int samples, int w, int h, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
 
 int main(int argc, char *argv[])
 {
 	VoxelizerArgs *args = parseArgs(argc, argv);
 
 	args->debug(0) << "\nLoading Mesh" << std::endl;
-	loadMesh(args->input.c_str(), args->size);
-
+	const int dimension = 3;
+	loadMesh(args->input.c_str(), args->size,dimension);
 	clock_t start = clock();
 	args->debug(0) << "Voxelizing in the GPU, this might take a while." << std::endl;
 	if (args->samples > -1) args->debug(0) << "Randomly choosing " << args->samples << " directions." << std::endl;
-	kernel_wrapper(args->samples, args->size, args->size, args->size, g_voxelGrid, g_triangleList, args->double_thick);
+	kernel_wrapper_3D(args->samples, args->size, args->size, args->size, g_voxelGrid, g_triangleList, args->double_thick);
 
-	// Summary: teapot.obj (9000 triangles) @ 512x512x512, 3 samples in: 15 seconds
-	args->debug(0) << "Summary: "
+	if (dimension == 3)
+	{
+		args->debug(0) << "Summary: "
 		<< utils::split(args->input, '/').back() 
 		<< " (" << g_triangleList.size() << " triangles)"
 		<< " @ " << g_voxelGrid->m_dimX << "x" << g_voxelGrid->m_dimY << "x" << g_voxelGrid->m_dimZ;
+	}
+	else if (dimension == 2)
+	{
+		args->debug(0) << "Summary: "
+		<< utils::split(args->input, '/').back() 
+		<< " (" << g_triangleList.size() << " triangles)"
+		<< " @ " << g_voxelGrid->m_dimX << "x" << g_voxelGrid->m_dimY;
+	}
+	// Summary: teapot.obj (9000 triangles) @ 512x512x512, 3 samples in: 15 seconds
 	if (args->samples > 0) 
 		args->debug(0) << ", " << args->samples << " samples" ;
 	else args->debug(0) << ", 1 sample" ;

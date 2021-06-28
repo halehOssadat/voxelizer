@@ -64,11 +64,11 @@ namespace CompFab
     }Vec3i;
 
     //Data Types
-    typedef struct Vec2fStruct
+    typedef struct Vec2Struct
     {
         
-        Vec2fStruct();
-        Vec2fStruct(precision_type x, precision_type y);
+        Vec2Struct();
+        Vec2Struct(precision_type x, precision_type y);
         
         union
         {
@@ -78,6 +78,12 @@ namespace CompFab
         
         inline float & operator[](unsigned int index) { return m_pos[index]; }
         inline const float & operator[](unsigned int index) const { return m_pos[index]; }
+        inline void operator+=(const Vec2Struct &a)
+        {
+            m_x += a.m_x;
+            m_y += a.m_y;
+        }
+        void normalize();
         
     }Vec2f;
 
@@ -115,6 +121,10 @@ namespace CompFab
     //Dot Product
     precision_type operator*(const Vec3 &v1, const Vec3 &v2);
     
+
+    // compute v1 - v2
+    Vec2f operator-(const Vec2f &v1, const Vec2f &v2);
+
     //comparison
     bool operator==(const Vec3 &v1, const Vec3 &v2);
     
@@ -123,6 +133,7 @@ namespace CompFab
     {
         //Square voxels only
         VoxelGridStruct(Vec3 lowerLeft, unsigned int dimX, unsigned int dimY, unsigned int dimZ, precision_type spacing);
+        VoxelGridStruct(Vec2f lowerLeft, unsigned int dimX, unsigned int dimY, precision_type spacing);
         ~VoxelGridStruct();
 
         void save_binvox(const char * filename);
@@ -137,6 +148,7 @@ namespace CompFab
         unsigned int m_dimX, m_dimY, m_dimZ, m_size;
         precision_type m_spacing;
         Vec3 m_lowerLeft;
+        Vec2f m_lowerLeft_2;
         
     } VoxelGrid;
 }

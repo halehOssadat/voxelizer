@@ -20,11 +20,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
+
+
 # set up include directories
 include_directories(/usr/local/cuda/include )
 include_directories("${BASEPATH}")
 include_directories(BEFORE "${TCLAP_INCLUDE}")
 
+SET(CUDA_SEPARABLE_COMPILATION ON)
 # add executable
 CUDA_ADD_EXECUTABLE(voxelizer ${SOURCES})
 

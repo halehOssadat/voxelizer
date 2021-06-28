@@ -295,6 +295,7 @@ void Mesh::read_stl(std::istream &f,bool stlFlag)
   else
   {
     // I need to add reading stl files
+    //read_stl_ascii(f);
     std::cout << "Unable to read STL ASCII files" << std::endl;
   }
 }
@@ -388,6 +389,128 @@ bool Mesh::read_stl_bin(std::istream &file)
   return true;
 
 }
+
+/*bool Mesh::read_stl_ascii(std::istream &file)
+{
+  constexpr size_t LINE_SIZE = 256;
+  char line[LINE_SIZE];
+  bool success = true;
+
+  if (!file) {
+    throw std::runtime_error("Failed to open file");
+  }
+
+  // skip header line.
+  file.getline(line, LINE_SIZE);
+
+  auto parse_ascii_normal = [=](const char *line) {
+    double x, y, z;
+    size_t fn = sscanf(line, " facet normal %lf %lf %lf", &x, &y, &z);
+    assert(fn == 3);
+    if (fn != 3) {
+      return false;
+    }
+    CompFab::Vec3 n1;
+    n1[0] = x;
+    n1[1] = y;
+    n1[2] = z;
+    n.push_back(n1);
+    return true;
+  };
+
+  auto parse_ascii_vertex = [&](const char *line) {
+    double x, y, z;
+    size_t fn = sscanf(line, " vertex %lf %lf %lf", &x, &y, &z);
+    assert(fn == 3);
+    if (fn != 3) {
+      return false;
+    }
+
+    CompFab::Vec3 v1;
+    v1[0] = x;
+    v1[1] = y;
+    v1[2] = z;
+    v.push_back(v1);
+  
+    return true;
+  };
+  
+  auto parse_ascii_facet = [&parse_ascii_vertex, &parse_ascii_normal](std::istream &fin) {
+    constexpr size_t LINE_SIZE = 256;
+    constexpr size_t WORD_SIZE = 128;
+    char line[LINE_SIZE];
+    char first_word[WORD_SIZE];
+    const std::string face_begin = "facet";
+    const std::string face_end = "endfacet";
+    const std::string loop_begin = "outer";
+    const std::string loop_end = "endloop";
+    const std::string vertex_flag = "vertex";
+
+    std::string firstword(first_word);
+
+    bool reading_facet = false;
+    bool reading_loop = false;
+    bool success = true;
+    size_t num_vts = 0;
+    while (!fin.eof()) {
+      fin.getline(line, LINE_SIZE);
+      size_t fn = sscanf(line, " %s", first_word);
+      if (fn == 0)
+        continue;
+      if (firstword.find(face_begin) == 0) {
+        success = parse_ascii_normal(line);
+        assert(success);
+        reading_facet = true;
+      } else if (firstword.find(face_end) == 0) {
+        assert(reading_facet);
+        reading_facet = false;
+      } else if (firstword.find(loop_begin) == 0) {
+        reading_loop = true;
+      } else if (firstword.find(loop_end) == 0) {
+        assert(reading_loop);
+        reading_loop = false;
+      } else if (firstword.find(vertex_flag) == 0) {
+        assert(reading_facet);
+        assert(reading_loop);
+        success = parse_ascii_vertex(line);
+        assert(success);
+        num_vts += 1;
+      }
+      if (!success) {
+        return false;
+      }
+      if (!reading_facet) {
+        break;
+      }
+    }
+    if (num_vts == 0) {
+      return true;
+    }
+    assert(num_vts == 3);
+    if (num_vts != 3) {
+      std::cerr << "Warning: mesh contain face made of " << num_vts
+                << " vertices" << std::endl;
+      return false;
+    }
+    return true;
+  };
+  
+  while (!file.eof()) {
+    success = parse_ascii_facet(file);
+    if (!success) {
+      return false;
+    }
+  }
+  
+  trig.resize(v.size() / 3);
+    for (size_t f = 0; f < F.size(); ++f) {
+    auto v = (f * 3);
+    F[f] = {{v, v + 1, v + 2}};
+  }
+  
+  return success;
+}
+*/
 
 bool Mesh::is_bin_stl(std::istream &file)
 {
@@ -530,6 +653,11 @@ void BBox(const Mesh & m,
   BBox(m.v, mn, mx);
 }
 
+void BBox(const Mesh &m, CompFab::Vec2f &mn, CompFab::Vec2f &mx)
+{
+  BBox(m.v, mn, mx);
+}
+
 bool is_nbr(const CompFab::Vec3i & a, const CompFab::Vec3i&b, int vert)
 {
   for (int ii=0; ii<3; ii++) {
@@ -600,4 +728,25 @@ void BBox(const std::vector<CompFab::Vec3 >& v,
     }
   }
 }
+
+void BBox(const std::vector<CompFab::Vec3> &v, CompFab::Vec2f &mn, CompFab::Vec2f &mx)
+{
+  mn[0] = v[0][0];
+  mn[1] = v[0][1];
+  mx[0] = v[0][0];
+  mx[1] = v[0][1];
+  
+  for(unsigned int ii = 1 ;ii<v.size();ii++){
+    for(int dim = 0 ; dim<2;dim++){
+      if(v[ii][dim]<mn[dim]){
+        mn[dim] = v[ii][dim];
+      }
+      if(v[ii][dim]>mx[dim]){
+        mx[dim] = v[ii][dim];
+      }
+    }
+  }
+}
+
+
 
