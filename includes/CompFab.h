@@ -137,11 +137,17 @@ namespace CompFab
         ~VoxelGridStruct();
 
         void save_binvox(const char * filename);
-
+        void save_pgm(const char *filename);
+        
         inline bool & isInside(unsigned int i, unsigned int j, unsigned int k)
         {
             
             return m_insideArray[k*(m_dimX*m_dimY)+j*m_dimY + i];
+        }
+
+        inline bool & isInside(unsigned int i, unsigned int j)
+        {
+            return m_insideArray[j*m_dimX + i];
         }
         
         bool *m_insideArray;

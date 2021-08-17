@@ -582,6 +582,7 @@ void Mesh::load_mesh(const char * filename, bool normalize)
     break;
   case 'l':
     read_stl(f,is_bin_stl(f));
+    break;
   default:
     break;
   }

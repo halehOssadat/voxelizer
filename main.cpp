@@ -11,7 +11,7 @@
 // #include <cstdlib>
 #include <cstdlib>
 
-enum FileFormat { obj, binvox };
+enum FileFormat { obj, binvox, pgm };
 
 struct VoxelizerArgs : Args {
 	// path to files
@@ -23,6 +23,7 @@ struct VoxelizerArgs : Args {
 	// width, height, depth;
 	int samples;
 	int dimension;
+	int nodeN;
 };
 
 // construct the command line arguments
@@ -36,9 +37,10 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	TCLAP::UnlabeledValueArg<std::string> output("output","path to save voxel grid", true, "", "string");
 
 	TCLAP::ValueArg<std::string> format("f", "format","voxel grid save format - obj|binvox", false, "binvox", "string");
-	TCLAP::ValueArg<int> size(  "r","resolution", "voxelization resolution",  false, 32, "int");
+	TCLAP::ValueArg<int> size( "r","resolution", "voxelization resolution",  false, 32, "int");
 	TCLAP::ValueArg<int> samples( "s","samples", "number of sample rays per vertex",  false, -1, "int");
 	TCLAP::ValueArg<int> dimension( "i","dimension", "number of dimensions",  false, 3, "int");
+	TCLAP::ValueArg<int> nodeN( "n","nodes", "number of thread nodes",  false, 8, "int");
 
 	TCLAP::MultiSwitchArg verbosity( "v", "verbose", "Verbosity level. Multiple flags for more verbosity.");
 	TCLAP::SwitchArg double_thick( "d", "double", "Flag for processing double-thick meshes. Uses (num_intersections/2)%2 for occupancy checking.", false);
@@ -50,6 +52,7 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	// cmd.add(width); cmd.add(height); cmd.add(depth); 
 	cmd.add(verbosity); cmd.add(samples); cmd.add(double_thick);
 	cmd.add(dimension);
+	cmd.add(nodeN);
 	cmd.parse( argc, argv );
 
 	// store in wrapper struct
@@ -63,6 +66,7 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	args->verbosity  = verbosity.getValue();
 	args->double_thick  = double_thick.getValue();
 	args->dimension = dimension.getValue();
+	args->nodeN = nodeN.getValue();
 
 	args->debug(1) << "input:     " << args->input  << std::endl;
 	args->debug(1) << "output:    " << args->output << std::endl;
@@ -74,7 +78,13 @@ VoxelizerArgs * parseArgs(int argc, char *argv[]) {
 	} else if (fl == 'o' || fl == 'O') {
 		args->format = obj;
 		args->debug(1) << "save format: obj" << std::endl;
-	} else {
+	}else if (fl == 'p' || fl == 'P')
+	{
+		args->format = pgm;
+		args->debug(1) << "save format: pgm" << std::endl;
+
+	}
+	else {
 		args->debug(0) << "Unknown file format specified, use one of: (o) obj, (b) binvox" << std::endl;
 	}
 
@@ -110,6 +120,9 @@ bool loadMesh(const char *filename, unsigned int dim, const int D)
 		v1 = tempMesh->v[tempMesh->t[tri][0]];
 		v2 = tempMesh->v[tempMesh->t[tri][1]];
 		v3 = tempMesh->v[tempMesh->t[tri][2]];
+		/*std::cout << "triangle " << tri << " v1: " << v1[0] << " " << v1[1] << " " << v1[2];
+		std::cout << " v2: " << v2[0] << " " << v2[1] << " " << v2[2];
+		std::cout << "v3: " << v3[0] << " " << v3[1] << " " << v3[2] << std::endl;*/
 		g_triangleList.push_back(CompFab::Triangle(v1,v2,v3));
 	}
 
@@ -163,7 +176,6 @@ bool loadMesh(const char *filename, unsigned int dim, const int D)
 		g_voxelGrid = new CompFab::VoxelGrid(bbMin-hspacing, dim, dim, spacing);
 	}
 	
-
 	delete tempMesh;
 	return true;
 }
@@ -207,6 +219,9 @@ bool save(VoxelizerArgs *args) {
 		case binvox:
 			g_voxelGrid->save_binvox((args->output + ".binvox").c_str());
 			break;
+		case pgm:
+			g_voxelGrid->save_pgm((args->output + ".pgm").c_str());
+			break;
 		default:
 			args->debug(0) << "Failed to save - no file type specified." << std::endl;
 			return false;
@@ -214,24 +229,24 @@ bool save(VoxelizerArgs *args) {
 	return true;
 }
 
-extern void kernel_wrapper_3D(int samples, int w, int h, int d, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
+extern void kernel_wrapper_3D(int samples, int w, int h, int d,int nodeN, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
 
-//extern void kernel_wrapper_2D(int samples, int w, int h, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
+extern void kernel_wrapper_2D(int samples, int w, int h, CompFab::VoxelGrid *g_voxelGrid, std::vector<CompFab::Triangle> triangles, bool double_thick);
 
 int main(int argc, char *argv[])
 {
 	VoxelizerArgs *args = parseArgs(argc, argv);
 
 	args->debug(0) << "\nLoading Mesh" << std::endl;
-	const int dimension = 3;
+	const int dimension = args->dimension;
 	loadMesh(args->input.c_str(), args->size,dimension);
 	clock_t start = clock();
 	args->debug(0) << "Voxelizing in the GPU, this might take a while." << std::endl;
 	if (args->samples > -1) args->debug(0) << "Randomly choosing " << args->samples << " directions." << std::endl;
-	kernel_wrapper_3D(args->samples, args->size, args->size, args->size, g_voxelGrid, g_triangleList, args->double_thick);
-
+	std::cout << "spacing" << g_voxelGrid->m_spacing << std::endl;
 	if (dimension == 3)
 	{
+		kernel_wrapper_3D(args->samples, args->size, args->size, args->size,args->nodeN, g_voxelGrid, g_triangleList, args->double_thick);
 		args->debug(0) << "Summary: "
 		<< utils::split(args->input, '/').back() 
 		<< " (" << g_triangleList.size() << " triangles)"
@@ -239,6 +254,8 @@ int main(int argc, char *argv[])
 	}
 	else if (dimension == 2)
 	{
+		args->format = pgm;
+		kernel_wrapper_2D(args->samples, args->size, args->size, g_voxelGrid, g_triangleList, args->double_thick);
 		args->debug(0) << "Summary: "
 		<< utils::split(args->input, '/').back() 
 		<< " (" << g_triangleList.size() << " triangles)"
@@ -254,6 +271,6 @@ int main(int argc, char *argv[])
 	if (!save(args)) {
 		args->debug(0) << "Failed to save! Exiting." << std::endl;
 	};
-
+	
 	return 0;
 }

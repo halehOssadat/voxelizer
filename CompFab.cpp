@@ -181,7 +181,6 @@ CompFab::VoxelGridStruct::VoxelGridStruct(Vec3 lowerLeft, unsigned int dimX, uns
 //Grid Stucture for Voxels in 2D
 CompFab::VoxelGridStruct::VoxelGridStruct(Vec2f lowerLeft, unsigned int dimX, unsigned int dimY, precision_type spacing)
 {
-    std::cout << "reached" << std::endl;
     m_lowerLeft[0] = lowerLeft[0];
     m_lowerLeft[1] = lowerLeft[1];
     m_lowerLeft[2] = 0;
@@ -255,5 +254,26 @@ void CompFab::VoxelGridStruct::save_binvox(const char * filename)
     // Write rest
     output.write((char*)&current_seen, 1);
     output.close();
+}
+
+void CompFab::VoxelGridStruct::save_pgm(const char *filename)
+{
+    std::ofstream output(filename, std::ios::out | std::ios::binary);
+    assert(output);
+
+   output << "P2" << std::endl;
+   output << m_dimX << " " << m_dimY << std::endl;
+   output << "1" << std::endl;
+   int c = 0;
+   for (int x = 0; x < m_dimX; ++x) {
+       for (int y = 0; y < m_dimY; ++y) {
+           //std::cout << isInside(x,y);
+           output << (int)(1 - isInside(x,y)) << " ";
+       }
+       output << std::endl;
+       //std::cout << std::endl;
+   }
+
+   output.close();
 }
 

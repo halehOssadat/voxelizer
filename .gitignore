@@ -1,3 +1,6 @@
 build/
 *.settings
 .vscode/
+Input.txt
+logs/
+Output.txt
